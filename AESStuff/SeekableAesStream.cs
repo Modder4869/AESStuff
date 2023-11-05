@@ -14,7 +14,7 @@ public class SeekableAesStream : Stream
     public SeekableAesStream(Stream baseStream, string password, byte[] salt)
     {
         this.baseStream = baseStream;
-        using (var key = new Rfc2898DeriveBytes(password, salt))
+        using (var key = new PasswordDeriveBytes(password, salt))
         {
             aes = new AesManaged();
             aes.KeySize = 128;

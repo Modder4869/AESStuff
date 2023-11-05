@@ -1,49 +1,70 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
 namespace AESStuff
 {
+    
+    public class FNames
+    {
+        public List<string>? FileName { get; set; }
+    }
+
     class Program
     {
+        static Dictionary<string, string> fileToPath = new Dictionary<string, string>();
         static void Main(string[] args)
         {
-            if (args.Length < 3)
+            if (args.Length < 4)
             {
-                Console.WriteLine("Usage: AESStuff <inputFolder> <outputFolder>");
+                Console.WriteLine("Usage: AESStuff <inputFolder> <outputFolder> <password> <json path>");
                 return;
             }
 
             string inputFolder = args[0];
             string outputFolder = args[1];
 
-            string password = args[2];
+            string password = args[3];
+            var jsonData = ReadJsonFile(args[2]);
+          
 
-            DecryptFolder(inputFolder, password, outputFolder);
-        }
-
-        public static void DecryptFolder(string inputFolder, string password, string outputFolder)
-        {
-            string[] files = Directory.GetFiles(inputFolder);
-
-            byte[] saltBytes = null;
-
-            foreach (string filePath in files)
+            if (jsonData != null)
             {
-                if (File.Exists(filePath))
+                for (int i = 0; i < jsonData.FileName.Count; i++)
                 {
+                    string filePath = jsonData.FileName[i];
                     string fileName = Path.GetFileName(filePath);
-                    saltBytes = Encoding.UTF8.GetBytes(fileName);
-                    break;
+                    fileToPath[fileName] = filePath;
                 }
             }
-
-            if (saltBytes == null)
+        
+        DecryptFolder(inputFolder, password, outputFolder);
+        }
+        public static FNames ReadJsonFile(string jsonFilePath)
+        {
+            try
             {
-                Console.WriteLine("No files found in the input folder.");
-                return;
+                // Read the JSON file
+                string jsonContent = File.ReadAllText(jsonFilePath);
+
+                // Parse the JSON data into a dictionary
+                FNames Names = JsonConvert.DeserializeObject<FNames>(jsonContent);
+
+
+                return Names;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine("An error occurred: " + ex.Message);
+                return null;
+            }
+        }
+        public static void DecryptFolder(string inputFolder, string password, string outputFolder)
+        {
+             string[] files = Directory.GetFiles(inputFolder, "*.unity3d", SearchOption.AllDirectories);
 
             if (!Directory.Exists(outputFolder))
             {
@@ -56,14 +77,21 @@ namespace AESStuff
                 {
                     string fileName = Path.GetFileName(filePath);
                     string destinationFilePath = Path.Combine(outputFolder, fileName);
-                    DecryptFile(filePath, password, destinationFilePath);
+                    DecryptFile(fileName, filePath, password, destinationFilePath);
                 }
             }
         }
 
-        public static void DecryptFile(string filePath, string password, string destinationFilePath)
+        public static void DecryptFile(string filename, string filePath, string password, string destinationFilePath)
         {
-            byte[] saltBytes = Encoding.UTF8.GetBytes(Path.GetFileName(filePath));
+            if (!fileToPath.ContainsKey(filename))
+            {
+                Console.WriteLine($"Missing Key/Not Encrypted for {filename}");
+                return;
+            }
+            string value = fileToPath[filename];
+            Console.WriteLine($"salt for {filename} is {value}");
+            byte[] saltBytes = Encoding.UTF8.GetBytes(value);
 
             using (Stream baseStream = File.OpenRead(filePath))
             {
